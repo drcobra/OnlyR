@@ -124,7 +124,12 @@ public sealed class AudioRecorder : IDisposable
         // WasapiLoopbackCapture doesn't record any audio when nothing is playing
         // so we must play some silence!
 
-        var silence = new SilenceProvider(new WaveFormat(44100, 2));
+        if (_waveSource?.WaveFormat == null)
+        {
+            return;
+        }
+
+        var silence = new SilenceProvider(_waveSource.WaveFormat);
         _silenceWaveOut = new WaveOutEvent();
         _silenceWaveOut.Init(silence);
         _silenceWaveOut.Play();
@@ -209,7 +214,6 @@ public sealed class AudioRecorder : IDisposable
     {
         Cleanup();
         OnRecordingStatusChangeEvent(new RecordingStatusChangeEventArgs(RecordingStatus.NotRecording));
-        _fader = null;
     }
 
     private void WaveSourceDataAvailableHandler(object? sender, WaveInEventArgs waveInEventArgs)
@@ -301,12 +305,23 @@ public sealed class AudioRecorder : IDisposable
         _audioWriter?.Dispose();
         _audioWriter = null;
 
+        if (_fader != null)
+        {
+            _fader.FadeComplete -= FadeCompleteHandler;
+            _fader = null;
+        }
+
         _tempRecordingFilePath = null;
     }
 
     private void InitFader(int sampleRate)
     {
         // used to optionally fade out a recording
+        if (_fader != null)
+        {
+            _fader.FadeComplete -= FadeCompleteHandler;
+        }
+
         _fader = new VolumeFader(sampleRate);
         _fader.FadeComplete += FadeCompleteHandler;
     }

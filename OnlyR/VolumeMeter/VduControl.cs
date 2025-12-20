@@ -20,10 +20,26 @@ namespace OnlyR.VolumeMeter
         /// </summary>
         public static readonly DependencyProperty VolumeLevelProperty =
             DependencyProperty.Register(
-                "VolumeLevel", typeof(int), typeof(VduControl), new PropertyMetadata(0, OnVolumeChanged));
+                nameof(VolumeLevel), typeof(int), typeof(VduControl), new PropertyMetadata(0, OnVolumeChanged, CoerceVolumeLevel));
+
+#pragma warning disable U2U1011
+#pragma warning disable CA1859
+        private static object CoerceVolumeLevel(DependencyObject d, object baseValue)
+#pragma warning restore CA1859
+#pragma warning restore U2U1011
+        {
+            var value = (int)baseValue;
+            return Math.Clamp(value, 0, 100);
+        }
 
         // change number of levels to add or remove display "blocks"
         private readonly int _levelsCount = 14;
+        private const int RedBlocksDivisor = 7;
+        private const int YellowBlocksDivisor = 4;
+
+        private int _cachedNumRedBlocks;
+        private int _cachedNumYellowBlocks;
+
         private readonly DrawingVisual _drawingVisual;
 
         private Image? _image;
@@ -34,6 +50,7 @@ namespace OnlyR.VolumeMeter
         private SolidColorBrush _redBrush;
 
         private List<RenderTargetBitmap?> _bitmaps;
+        private Size _lastSize;
 
         static VduControl()
         {
@@ -49,6 +66,8 @@ namespace OnlyR.VolumeMeter
             InitBrushes();
 
             _drawingVisual = new DrawingVisual();
+
+            Unloaded += OnUnloaded;
         }
 
         /// <summary>
@@ -56,9 +75,6 @@ namespace OnlyR.VolumeMeter
         /// </summary>
         public int VolumeLevel
         {
-            // wrapper (no additional code in here!)
-
-            // ReSharper disable once PossibleNullReferenceException
             get => (int)GetValue(VolumeLevelProperty);
             set => SetValue(VolumeLevelProperty, value);
         }
@@ -75,7 +91,43 @@ namespace OnlyR.VolumeMeter
             if (GetTemplateChild("InnerBorder") is Border border)
             {
                 _innerBorder = border;
+                _innerBorder.SizeChanged += OnSizeChanged;
             }
+        }
+
+        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_innerBorder != null)
+            {
+                var newSize = new Size(_innerBorder.ActualWidth, _innerBorder.ActualHeight);
+                if (_lastSize != newSize)
+                {
+                    InvalidateBitmaps();
+                    _lastSize = newSize;
+                    Refresh();
+                }
+            }
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (_innerBorder != null)
+            {
+                _innerBorder.SizeChanged -= OnSizeChanged;
+            }
+
+            Unloaded -= OnUnloaded;
+            Cleanup();
+        }
+
+        private void Cleanup()
+        {
+            InvalidateBitmaps();
+
+            _backBrush?.Freeze();
+            _lightGreenBrush?.Freeze();
+            _yellowBrush?.Freeze();
+            _redBrush?.Freeze();
         }
 
         private static void OnVolumeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -110,7 +162,16 @@ namespace OnlyR.VolumeMeter
             }
 
             var bmpHeight = (int)_innerBorder.ActualHeight;
+            if (bmpHeight == 0)
+            {
+                return null;
+            }
+
             var overallBlockHeight = bmpHeight / _levelsCount;
+            if (overallBlockHeight == 0)
+            {
+                return null;
+            }
 
             bmpHeight = overallBlockHeight * _levelsCount;  // normalise
 
@@ -118,12 +179,17 @@ namespace OnlyR.VolumeMeter
             var blockHeight = overallBlockHeight - ySpaceBetweenBlocks;
 
             var bmpWidth = (int)_innerBorder.ActualWidth;
+            if (bmpWidth == 0)
+            {
+                return null;
+            }
+
             var blockWidth = bmpWidth;
 
             _bitmaps[numBlocksLit] = new RenderTargetBitmap(bmpWidth, bmpHeight, 96, 96, PixelFormats.Pbgra32);
 
-            var numRedBlocks = _levelsCount / 7;
-            var numYellowBlocks = _levelsCount / 4;
+            var numRedBlocks = _cachedNumRedBlocks;
+            var numYellowBlocks = _cachedNumYellowBlocks;
 
             using (DrawingContext dc = _drawingVisual.RenderOpen())
             {
@@ -146,8 +212,8 @@ namespace OnlyR.VolumeMeter
                     }
 
                     dc.DrawRectangle(
-                        b, 
-                        null, 
+                        b,
+                        null,
                         new Rect(
                         0,
                         bmpHeight - ((n + 1) * (blockHeight + ySpaceBetweenBlocks)),
@@ -160,21 +226,41 @@ namespace OnlyR.VolumeMeter
             return _bitmaps[numBlocksLit];
         }
 
+        private void InvalidateBitmaps()
+        {
+            for (var n = 0; n < _bitmaps.Count; ++n)
+            {
+                _bitmaps[n] = null;
+            }
+
+            InitBitmaps();
+
+            _cachedNumRedBlocks = _levelsCount / RedBlocksDivisor;
+            _cachedNumYellowBlocks = _levelsCount / YellowBlocksDivisor;
+        }
+
         [MemberNotNull(nameof(_backBrush), nameof(_lightGreenBrush), nameof(_yellowBrush), nameof(_redBrush))]
         private void InitBrushes()
         {
             _backBrush = new SolidColorBrush { Color = Colors.Black };
+            _backBrush.Freeze();
+
             _lightGreenBrush = new SolidColorBrush { Color = Colors.GreenYellow };
+            _lightGreenBrush.Freeze();
+
             _yellowBrush = new SolidColorBrush { Color = Colors.Yellow };
+            _yellowBrush.Freeze();
+
             _redBrush = new SolidColorBrush { Color = Colors.Red };
+            _redBrush.Freeze();
         }
 
         [MemberNotNull(nameof(_bitmaps))]
         private void InitBitmaps()
         {
-            _bitmaps = new List<RenderTargetBitmap?>();
+            _bitmaps = new List<RenderTargetBitmap?>(_levelsCount + 1);
 
-            for (int n = 0; n < _levelsCount + 1; ++n)
+            for (var n = 0; n < _levelsCount + 1; ++n)
             {
                 _bitmaps.Add(null);
             }
