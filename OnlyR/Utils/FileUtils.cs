@@ -295,28 +295,18 @@ namespace OnlyR.Utils
 
             try
             {
-                var today = DateTime.Today;
-                
-                // first try today's folder...
-                folder = GetDestinationFolder(today, commandLineIdentifier, destFolder);
+                // first try the root destination folder (where recordings are now saved)...
+                folder = GetRootDestinationFolder(commandLineIdentifier, destFolder);
 
                 if (!Directory.Exists(folder))
                 {
-                    // try this month's folder...
-                    folder = GetMonthlyDestinationFolder(today, commandLineIdentifier, destFolder);
-
-                    if (!Directory.Exists(folder))
+                    if (!string.IsNullOrEmpty(commandLineIdentifier))
                     {
-                        folder = GetRootDestinationFolder(commandLineIdentifier, destFolder);
+                        folder = GetRootDestinationFolder(string.Empty, destFolder);
 
-                        if (!Directory.Exists(folder) && !string.IsNullOrEmpty(commandLineIdentifier))
+                        if (!Directory.Exists(folder))
                         {
-                            folder = GetRootDestinationFolder(string.Empty, destFolder);
-
-                            if (!Directory.Exists(folder))
-                            {
-                                Directory.CreateDirectory(folder);
-                            }
+                            Directory.CreateDirectory(folder);
                         }
                     }
                 }

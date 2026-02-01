@@ -29,7 +29,7 @@ namespace OnlyR.Services.RecordingDestination
             DateTime dt,
             string? commandLineIdentifier)
         {
-            var destFolder = FileUtils.GetDestinationFolder(dt, commandLineIdentifier, optionsService.Options.DestinationFolder);
+            var destFolder = FileUtils.GetRootDestinationFolder(commandLineIdentifier, optionsService.Options.DestinationFolder);
             var finalPathAndTrack = GetNextAvailableFile(optionsService, destFolder, dt);
 
             if (finalPathAndTrack == null)
@@ -54,44 +54,17 @@ namespace OnlyR.Services.RecordingDestination
                 Directory.CreateDirectory(folder);
             }
 
-            var extensions = Enum.GetValues<AudioCodec>()
-                .Select(codec => codec.GetExtensionFormat())
-                .ToArray();
-
-            var files = Directory.EnumerateFiles(
-                    folder,
-                    $"{GenerateCoreCandidateFileName(dt)} - *.*")
-                .Where(f => extensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
-
-            var highestTrack = 0;
-            foreach (var file in files)
-            {
-                var fileName = Path.GetFileNameWithoutExtension(file);
-                var trackStr = fileName[^3..];
-                if (!int.TryParse(trackStr, out var trackNum))
-                {
-                    continue;
-                }
-
-                highestTrack = Math.Max(highestTrack, trackNum);
-                if (highestTrack + 1 >= optionsService.Options.MaxRecordingsInOneFolder)
-                {
-                    return null;
-                }
-            }
-
-            var nextTrack = highestTrack + 1;
-            var filePath = GenerateCandidateFilePath(folder, dt, nextTrack, optionsService.Options.Codec);
-            return new PathAndTrackNumber(filePath, nextTrack);
+            var filePath = GenerateCandidateFilePath(folder, dt, optionsService.Options.Codec);
+            return new PathAndTrackNumber(filePath, 1);
         }
 
-        private static string GenerateCandidateFilePath(string folder, DateTime dt, int increment, AudioCodec codec) =>
+        private static string GenerateCandidateFilePath(string folder, DateTime dt, AudioCodec codec) =>
             Path.Combine(
                 folder,
-                $"{GenerateCoreCandidateFileName(dt)} - {increment:D3}.{codec.GetExtensionFormat()}");
+                $"{GenerateCoreCandidateFileName(dt)}.{codec.GetExtensionFormat()}");
         
         private static string GenerateCoreCandidateFileName(DateTime dt)
-            => $"{CultureInfo.CurrentCulture.DateTimeFormat.DayNames[(int)dt.DayOfWeek]} {dt:dd MMMM yyyy}";
+            => $"{dt:yyyy.MM.dd HH-mm-ss} {CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames[(int)dt.DayOfWeek]}";
 
         /// <summary>
         /// Gets a file name that can be used to temporarily store recording data
