@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using CommunityToolkit.Mvvm.DependencyInjection;
@@ -24,6 +25,11 @@ namespace OnlyR
         private const double SettingsWindowMaxWidth = 500;
         private const double SettingsWindowMaxHeight = 770;
 
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -37,6 +43,7 @@ namespace OnlyR
             base.OnSourceInitialized(e);
 
             AdjustMainWindowPositionAndSize();
+            EnableDarkTitleBar();
 
             var source = PresentationSource.FromVisual(this) as HwndSource;
             source?.AddHook(WndProc);
@@ -89,6 +96,16 @@ namespace OnlyR
             if (optionsService != null)
             {
                 optionsService.Options.SettingsPageSize = new Size(Width, Height);
+            }
+        }
+
+        private void EnableDarkTitleBar()
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                int value = 1; // 1 = dark mode, 0 = light mode
+                DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
             }
         }
 

@@ -10,10 +10,13 @@
     Width="268"
     Height="300"
     AutomationProperties.Name="{x:Static resx:Resources.ACCESSIBILITY_ONLY_R}"
+    Background="{DynamicResource MaterialDesignPaper}"
     Closing="WindowClosing"
     DataContext="{Binding Main, Mode=OneWay, Source={StaticResource Locator}}"
+    FontFamily="{DynamicResource MaterialDesignFont}"
     Icon="iconmic.ico"
     ResizeMode="CanMinimize"
+    TextElement.Foreground="{DynamicResource MaterialDesignBody}"
     Topmost="{Binding AlwaysOnTop, Mode=OneWay}"
     mc:Ignorable="d">
 
