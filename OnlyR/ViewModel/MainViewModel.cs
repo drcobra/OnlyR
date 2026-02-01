@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -12,7 +10,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using MaterialDesignThemes.Wpf;
 using OnlyR.ViewModel.Messages;
 using OnlyR.Model;
-using OnlyR.AutoUpdates;
 using OnlyR.Services.AudioSilence;
 using OnlyR.Services.PurgeRecordings;
 using OnlyR.Pages;
@@ -92,8 +89,6 @@ namespace OnlyR.ViewModel
                                  _unfinishedRecordingFileFoundOnStartup == null
             };
 
-            GetVersionData();
-
             WeakReferenceMessenger.Default.Send(new NavigateMessage(
                 null, RecordingPageViewModel.PageName, state));
 
@@ -171,30 +166,6 @@ namespace OnlyR.ViewModel
         private void RecordingStoppedDuringAppClose(object? sender, EventArgs e)
         {
             WeakReferenceMessenger.Default.Send(new ShutDownApplicationMessage());
-        }
-
-        private void GetVersionData()
-        {
-            Task.Delay(2000).ContinueWith(_ =>
-            {
-                var latestVersion = VersionDetection.GetLatestReleaseVersion();
-                if (latestVersion != null && latestVersion > VersionDetection.GetCurrentVersion())
-                {
-                    // there is a new version....
-                    _snackbarService.Enqueue("Update available", Properties.Resources.VIEW, LaunchWebPage);
-                }
-            });
-        }
-
-        private void LaunchWebPage()
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = VersionDetection.LatestReleaseUrl,
-                UseShellExecute = true
-            };
-
-            Process.Start(psi);
         }
 
         private void FixAnyUnfinishedRecording()
